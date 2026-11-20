@@ -1,0 +1,44 @@
+Atue como um desenvolvedor web especialista em JavaScript puro, HTML5 e CSS3. Preciso que você crie o código completo para um site interativo de RPG de mesa chamado "Chronicles & Sheet".
+
+O projeto deve ser 100% client-side, sem dependências de backend, pronto para deploy no GitHub Pages.
+
+---
+
+### REQUISITOS DE ARQUITETURA E TECNOLOGIA:
+1. Estrutura em arquivo único (ou separada em index.html, styles.css e script.js).
+2. Sem frameworks ou bibliotecas externas (Vanilla JavaScript puro).
+3. Persistência de dados local via `localStorage`.
+4. Sistema de Exportação e Importação de backup em arquivos `.json`.
+
+---
+
+### FUNCIONALIDADES OBRIGATÓRIAS:
+
+1. **Ficha Técnica do Personagem:**
+   - Campos editáveis para nome, classe, nível, atributos e anotações gerais.
+   - Controle dinâmico de Pontos de Vida (HP) com barra visual e botões de (+1, -1, +5, -5).
+   - Alerta/indicador visual quando o HP estiver crítico (ex: abaixo de 25% ou em 0).
+
+2. **Inventário Interativo:**
+   - Adicionar, editar e remover itens.
+   - Campos para nome do item, quantidade e descrição curta.
+
+3. **Rolador de Dados Integrado:**
+   - Botões para dados padrão (d4, d6, d8, d10, d12, d20, d100).
+   - Histórico das últimas rolagens exibido na tela com timestamps ou registro visual.
+
+4. **Diário de Bordo & Livro de Eventos:**
+   - Registro de anotações interpretativas e eventos da campanha.
+   - Sistema de tags (ex: #Combate, #Lore, #NPC, #Quest).
+   - Filtro funcional para buscar anotações por tag ou palavra-chave.
+
+5. **Alternador de Interface (Temas/Modos):**
+   - Alternância entre "Modo Ficha de Campo" (interface técnica, limpa e moderna) e "Modo Diário Manuscrito" (estilo antigo/fantasia estilo paminho).
+
+---
+
+### O QUE VOCÊ DEVE GERAR:
+Por favor, forneça:
+1. O **HTML5** estruturado e semântico.
+2. O **CSS3** responsivo com as variáveis de estilo para os dois temas.
+3. O **JavaScript** completo contendo toda a manipulação dinâmica do DOM, eventos dos botões, lógica das rolagens de dados, manipulação do `localStorage` e lógica de download/upload do arquivo `.json`.

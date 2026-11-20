@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Chronicles & Sheet</title>
+    <meta
+      name="description"
+      content="Ficha de personagem, inventário, rolagens de dados e diário de campanha para RPG de mesa."
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body data-theme="field">
+    <div class="app-shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">RPG de mesa</p>
+          <h1>Chronicles & Sheet</h1>
+        </div>
+
+        <div class="topbar-actions">
+          <button id="themeToggle" class="primary-btn" type="button" aria-label="Alternar tema">
+            Modo Diário Manuscrito
+          </button>
+          <button id="exportBtn" class="secondary-btn" type="button">Exportar Backup</button>
+          <label class="secondary-btn file-upload" for="importFile">
+            Importar Backup
+            <input id="importFile" type="file" accept=".json,application/json" />
+          </label>
+        </div>
+      </header>
+
+      <main class="layout">
+        <section class="panel" aria-labelledby="characterTitle">
+          <div class="panel-header">
+            <h2 id="characterTitle">Ficha Técnica do Personagem</h2>
+          </div>
+
+          <div class="character-grid">
+            <label class="field">
+              <span>Nome</span>
+              <input id="charName" name="name" type="text" placeholder="Nome do aventureiro" />
+            </label>
+
+            <label class="field">
+              <span>Classe</span>
+              <input id="charClass" name="class" type="text" placeholder="Classe" />
+            </label>
+
+            <label class="field compact">
+              <span>Nível</span>
+              <input id="charLevel" name="level" type="number" min="1" max="99" value="1" />
+            </label>
+
+            <label class="field wide">
+              <span>Anotações gerais</span>
+              <textarea id="charNotes" name="notes" rows="4" placeholder="Detalhes da ficha, objetivos, traços..."></textarea>
+            </label>
+          </div>
+
+          <div class="stats-panel">
+            <div class="hp-header">
+              <div>
+                <h3>Pontos de Vida</h3>
+              </div>
+              <div class="hp-readout">
+                <strong id="hpCurrentText">0</strong>
+                <span>/</span>
+                <input id="hpMaxInput" class="stat-max-input" type="number" min="1" value="30" aria-label="Máximo de pontos de vida" />
+              </div>
+            </div>
+
+            <div class="hp-bar-wrapper">
+              <div id="hpBar" class="hp-bar" aria-live="polite"></div>
+            </div>
+
+            <div class="hp-controls">
+              <button class="hp-btn" data-stat="hp" data-change="-5" type="button">-5</button>
+              <button class="hp-btn" data-stat="hp" data-change="-1" type="button">-1</button>
+              <button class="hp-btn" data-stat="hp" data-change="1" type="button">+1</button>
+              <button class="hp-btn" data-stat="hp" data-change="5" type="button">+5</button>
+            </div>
+
+            <div id="hpStatus" class="hp-status safe" aria-live="polite">
+              HP está estável.
+            </div>
+
+            <div class="vital-bars">
+              <div class="vital-bar-item">
+                <div class="hp-header compact-header">
+                  <div>
+                    <h3>Sanidade</h3>
+                  </div>
+                  <div class="hp-readout">
+                    <strong id="sanityCurrentText">0</strong>
+                    <span>/</span>
+                    <input id="sanityMaxInput" class="stat-max-input" type="number" min="1" value="20" aria-label="Máximo de sanidade" />
+                  </div>
+                </div>
+                <div class="hp-bar-wrapper">
+                  <div id="sanityBar" class="hp-bar sanity-bar" aria-live="polite"></div>
+                </div>
+
+                <div class="hp-controls">
+                  <button class="hp-btn vital-btn" data-stat="sanity" data-change="-5" type="button">-5</button>
+                  <button class="hp-btn vital-btn" data-stat="sanity" data-change="-1" type="button">-1</button>
+                  <button class="hp-btn vital-btn" data-stat="sanity" data-change="1" type="button">+1</button>
+                  <button class="hp-btn vital-btn" data-stat="sanity" data-change="5" type="button">+5</button>
+                </div>
+
+                <div id="sanityStatus" class="hp-status safe" aria-live="polite">Sanidade está estável.</div>
+              </div>
+
+              <div class="vital-bar-item">
+                <div class="hp-header compact-header">
+                  <div>
+                    <h3>Pontos de Esforço</h3>
+                  </div>
+                  <div class="hp-readout">
+                    <strong id="effortCurrentText">0</strong>
+                    <span>/</span>
+                    <input id="effortMaxInput" class="stat-max-input" type="number" min="1" value="8" aria-label="Máximo de pontos de esforço" />
+                  </div>
+                </div>
+                <div class="hp-bar-wrapper">
+                  <div id="effortBar" class="hp-bar effort-bar" aria-live="polite"></div>
+                </div>
+
+                <div class="hp-controls">
+                  <button class="hp-btn vital-btn" data-stat="effort" data-change="-5" type="button">-5</button>
+                  <button class="hp-btn vital-btn" data-stat="effort" data-change="-1" type="button">-1</button>
+                  <button class="hp-btn vital-btn" data-stat="effort" data-change="1" type="button">+1</button>
+                  <button class="hp-btn vital-btn" data-stat="effort" data-change="5" type="button">+5</button>
+                </div>
+
+                <div id="effortStatus" class="hp-status safe" aria-live="polite">Esforço está estável.</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="attributes-section">
+            <div class="attributes-header">
+              <h3>Atributos</h3>
+              <button id="toggleAttributesBtn" class="secondary-btn" type="button" aria-label="Ocultar atributos">
+                Ocultar
+              </button>
+            </div>
+
+            <div class="attributes-grid" aria-label="Atributos">
+              <div class="attribute" data-attribute="forca">
+                <label>FOR</label>
+                <input type="number" value="10" min="1" max="30" />
+              </div>
+              <div class="attribute" data-attribute="destreza">
+                <label>DES</label>
+                <input type="number" value="10" min="1" max="30" />
+              </div>
+              <div class="attribute" data-attribute="constituicao">
+                <label>CON</label>
+                <input type="number" value="10" min="1" max="30" />
+              </div>
+              <div class="attribute" data-attribute="inteligencia">
+                <label>INT</label>
+                <input type="number" value="10" min="1" max="30" />
+              </div>
+              <div class="attribute" data-attribute="sabedoria">
+                <label>SAB</label>
+                <input type="number" value="10" min="1" max="30" />
+              </div>
+              <div class="attribute" data-attribute="carisma">
+                <label>CAR</label>
+                <input type="number" value="10" min="1" max="30" />
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel" aria-labelledby="inventoryTitle">
+          <div class="panel-header">
+            <h2 id="inventoryTitle">Inventário</h2>
+          </div>
+
+          <div class="inventory-layout">
+            <form id="inventoryForm" class="inventory-form">
+              <input type="hidden" id="inventoryId" />
+              <label class="field">
+                <span>Nome do item</span>
+                <input id="itemName" type="text" placeholder="Poção de cura" required />
+              </label>
+
+              <label class="field compact">
+                <span>Quantidade</span>
+                <input id="itemQty" type="number" min="1" value="1" required />
+              </label>
+
+              <label class="field wide">
+                <span>Descrição</span>
+                <textarea id="itemDescription" rows="3" placeholder="Breve descrição do item"></textarea>
+              </label>
+
+              <div class="form-actions">
+                <button id="saveItemBtn" class="primary-btn" type="submit">Adicionar item</button>
+                <button id="cancelEditBtn" class="secondary-btn hidden" type="button">Cancelar edição</button>
+              </div>
+            </form>
+
+            <div class="inventory-list-wrap">
+              <ul id="inventoryList" class="inventory-list" aria-live="polite"></ul>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel" aria-labelledby="diceTitle">
+          <div class="panel-header">
+            <h2 id="diceTitle">Rolador de Dados</h2>
+          </div>
+
+          <div class="dice-grid">
+            <button class="dice-btn" type="button" data-sides="4">d4</button>
+            <button class="dice-btn" type="button" data-sides="6">d6</button>
+            <button class="dice-btn" type="button" data-sides="8">d8</button>
+            <button class="dice-btn" type="button" data-sides="10">d10</button>
+            <button class="dice-btn" type="button" data-sides="12">d12</button>
+            <button class="dice-btn" type="button" data-sides="20">d20</button>
+            <button class="dice-btn" type="button" data-sides="100">d100</button>
+          </div>
+
+          <div class="dice-actions">
+            <div class="dice-output">
+              <span>Última rolagem:</span>
+              <strong id="lastRoll">Nenhuma</strong>
+            </div>
+            <button id="clearDiceHistoryBtn" class="secondary-btn clear-dice-btn" type="button">Limpar histórico</button>
+          </div>
+
+          <ul id="diceHistory" class="dice-history" aria-live="polite"></ul>
+        </section>
+
+        <section class="panel journal-panel" aria-labelledby="journalTitle">
+          <div class="panel-header">
+            <h2 id="journalTitle">Diário de Bordo</h2>
+          </div>
+
+          <form id="journalForm" class="journal-form">
+            <label class="field">
+              <span>Título</span>
+              <input id="journalTitleInput" type="text" placeholder="Ex: Encontro na Ponte Quebrada" required />
+            </label>
+
+            <label class="field">
+              <span>Tags</span>
+              <input id="journalTagsInput" type="text" placeholder="#Combate, #Quest, #NPC" />
+            </label>
+
+            <label class="field">
+              <span>Registro</span>
+              <textarea id="journalContent" rows="5" placeholder="Descreva o evento, a sensação, o contexto e as consequências..." required></textarea>
+            </label>
+
+            <button class="primary-btn" type="submit">Salvar evento</button>
+          </form>
+
+          <div class="journal-filters">
+            <label class="field">
+              <span>Buscar por palavra-chave</span>
+              <input id="journalSearch" type="search" placeholder="Procure por texto ou tag" />
+            </label>
+
+            <label class="field">
+              <span>Filtrar por tag</span>
+              <select id="journalTagFilter">
+                <option value="all">Todas</option>
+              </select>
+            </label>
+          </div>
+
+          <ul id="journalList" class="journal-list" aria-live="polite"></ul>
+        </section>
+      </main>
+    </div>
+
+    <script src="script.js"></script>
+  </body>
+</html>
