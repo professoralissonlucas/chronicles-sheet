@@ -69,11 +69,24 @@ body {
   transition: background 0.25s ease, color 0.25s ease;
 }
 
+/* Fallback para navegadores sem color-mix(). Precisa ser @supports porque, com var(),
+   o navegador descarta a declaração inteira em vez de usar uma linha anterior.
+   rgb(12, 18, 34) é o mesmo resultado de --bg (#0f172a) 80% + preto 20%.
+   O tema journal tem seletor mais específico e continua com o próprio fundo. */
+@supports not (color: color-mix(in srgb, red 50%, blue)) {
+  body {
+    background:
+      radial-gradient(circle at top, rgba(139, 92, 246, 0.16), transparent 30%),
+      linear-gradient(180deg, var(--bg), rgb(12, 18, 34));
+  }
+}
+
 body[data-theme='journal'] {
   font-family: Georgia, 'Times New Roman', serif;
+  /* O padrão SVG vem primeiro para ficar por cima do gradiente (antes ficava escondido). */
   background:
-    linear-gradient(180deg, rgba(70, 48, 27, 0.96), rgba(31, 20, 12, 0.98)),
-    url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="160" height="160" viewBox="0 0 160 160"><rect width="160" height="160" fill="transparent"/><path d="M10 15 L30 15 L30 35 L10 35 Z M50 15 L70 15 L70 35 L50 35 Z M90 15 L110 15 L110 35 L90 35 Z M130 15 L150 15 L150 35 L130 35 Z M10 55 L30 55 L30 75 L10 75 Z M50 55 L70 55 L70 75 L50 75 Z M90 55 L110 55 L110 75 L90 75 Z M130 55 L150 55 L150 75 L130 75 Z M10 95 L30 95 L30 115 L10 115 Z M50 95 L70 95 L70 115 L50 115 Z M90 95 L110 95 L110 115 L90 115 Z M130 95 L150 95 L150 115 L130 115 Z" fill="rgba(208,165,96,0.08)"/></svg>');
+    url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160' viewBox='0 0 160 160'%3E%3Crect width='160' height='160' fill='none'/%3E%3Cpath d='M10 15 L30 15 L30 35 L10 35 Z M50 15 L70 15 L70 35 L50 35 Z M90 15 L110 15 L110 35 L90 35 Z M130 15 L150 15 L150 35 L130 35 Z M10 55 L30 55 L30 75 L10 75 Z M50 55 L70 55 L70 75 L50 75 Z M90 55 L110 55 L110 75 L90 75 Z M130 55 L150 55 L150 75 L130 75 Z M10 95 L30 95 L30 115 L10 115 Z M50 95 L70 95 L70 115 L50 115 Z M90 95 L110 95 L110 115 L90 115 Z M130 95 L150 95 L150 115 L130 115 Z' fill='rgba(208,165,96,0.08)'/%3E%3C/svg%3E"),
+    linear-gradient(180deg, rgba(70, 48, 27, 0.96), rgba(31, 20, 12, 0.98));
 }
 
 body[data-theme='field'] .journal-panel {
@@ -103,6 +116,8 @@ button:hover {
 }
 
 .app-shell {
+  width: calc(100% - 2rem);
+  max-width: 1200px;
   width: min(1200px, calc(100% - 2rem));
   margin: 0 auto;
   padding: 2rem 0 2.5rem;
@@ -118,6 +133,7 @@ button:hover {
   background: var(--bg-elevated);
   border: 1px solid var(--border);
   border-radius: 1rem;
+  -webkit-backdrop-filter: blur(10px);
   backdrop-filter: blur(10px);
   box-shadow: 0 16px 32px var(--shadow);
 }
@@ -139,6 +155,7 @@ p {
 
 h1 {
   margin-bottom: 0;
+  font-size: 3rem;
   font-size: clamp(2rem, 4vw, 3rem);
   letter-spacing: -0.04em;
 }
@@ -176,6 +193,10 @@ h1 {
 
 .file-upload input {
   position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
   inset: 0;
   opacity: 0;
   cursor: pointer;
@@ -194,6 +215,7 @@ h1 {
   border-radius: 1.15rem;
   box-shadow: 0 18px 36px var(--shadow);
   padding: 1.2rem;
+  -webkit-backdrop-filter: blur(8px);
   backdrop-filter: blur(8px);
 }
 
@@ -209,6 +231,7 @@ h1 {
 
 .panel-header h2 {
   margin-bottom: 0;
+  font-size: 1.7rem;
   font-size: clamp(1.25rem, 2vw, 1.7rem);
 }
 
@@ -412,50 +435,10 @@ h1 {
   padding: 0.6rem 0.7rem;
 }
 
-.attribute-name-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 0.35rem;
-  align-items: center;
-}
-
-.attribute-name-input {
-  min-width: 0;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.remove-attribute-btn {
-  width: 2rem;
-  height: 2rem;
-  padding: 0;
-  border-radius: 50%;
-  color: var(--danger);
-  background: var(--danger-soft);
-  font-size: 1.15rem;
-  line-height: 1;
-}
-
-.attributes-area {
-  margin-top: 1.5rem;
-  padding-top: 1rem;
-  border-top: 1px solid var(--border);
-}
-
-.attributes-area .attributes-grid {
-  margin-top: 0;
-  padding-top: 0;
-  border-top: 0;
-}
-
-.add-attribute-btn {
-  width: 100%;
-  margin-top: 0.8rem;
-}
-
+/* Formulário em cima e lista embaixo: o painel tem no máximo ~550px,
+   então as duas colunas lado a lado (mín. 596px) transbordavam. */
 .inventory-layout {
-  grid-template-columns: minmax(280px, 380px) minmax(300px, 1fr);
+  grid-template-columns: 1fr;
   align-items: start;
 }
 
@@ -671,6 +654,7 @@ h1 {
 
 @media (max-width: 640px) {
   .app-shell {
+    width: calc(100% - 1rem);
     width: min(100% - 1rem, 1200px);
     padding-top: 1rem;
   }
