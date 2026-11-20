@@ -294,7 +294,9 @@ h1 {
   border-top: 1px solid var(--border);
 }
 
-.hp-header {
+/* .attributes-header reaproveita o alinhamento dos cabeçalhos das barras: título à esquerda, controle à direita. */
+.hp-header,
+.attributes-header {
   display: flex;
   justify-content: space-between;
   align-items: center;

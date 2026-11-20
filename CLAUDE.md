@@ -18,7 +18,7 @@ Regras que valem para **todas** as tarefas neste projeto. A descrição completa
 
 - A chave do `localStorage` continua sendo **`chronicles-sheet-state-v1`**.
 - Backups `.json` já exportados precisam continuar sendo importados sem erro e sem perder dados.
-- Não renomear nem remover campos do `state` (`theme`, `character`, `inventory`, `diceHistory`, `journal` e seus subcampos). Campos novos só podem ser adicionados se também receberem valor padrão em `defaultState` e em `normalizeState`, para que backups antigos continuem funcionando.
+- Não renomear nem remover campos do `state` (`theme`, `character`, `inventory`, `diceHistory`, `journal` e seus subcampos). Campos novos só podem ser adicionados se também receberem valor em `defaultState` (exemplo do primeiro acesso), em `emptyState` (valor neutro usado para completar dados que faltam) e, se precisarem de validação, em `normalizeState`, para que backups antigos continuem funcionando.
 
 ## Estilo de código
 

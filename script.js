@@ -42,6 +42,33 @@ const defaultState = {
   ],
 };
 
+// Valores neutros para completar dados que faltam num backup ou no que estava salvo.
+// O personagem de exemplo (defaultState) aparece só no primeiro acesso, sem nada salvo.
+const emptyState = {
+  theme: 'field',
+  attributesHidden: false,
+  character: {
+    name: '',
+    className: '',
+    level: 1,
+    notes: '',
+    hp: { current: 30, max: 30 },
+    sanity: { current: 20, max: 20 },
+    effort: { current: 8, max: 8 },
+    attributes: {
+      forca: 10,
+      destreza: 10,
+      constituicao: 10,
+      inteligencia: 10,
+      sabedoria: 10,
+      carisma: 10,
+    },
+  },
+  inventory: [],
+  diceHistory: [],
+  journal: [],
+};
+
 const state = loadState();
 
 const characterFields = {
@@ -127,7 +154,8 @@ function generateId() {
 }
 
 function normalizeState(raw) {
-  const safe = JSON.parse(JSON.stringify(defaultState));
+  // O que faltar é completado com valores neutros, não com o personagem de exemplo.
+  const safe = JSON.parse(JSON.stringify(emptyState));
   // Backup que não é um objeto (array, número, null) é tratado como vazio.
   const merged = deepMerge(safe, isPlainObject(raw) ? raw : {});
 
@@ -140,7 +168,7 @@ function normalizeState(raw) {
   ['hp', 'sanity', 'effort'].forEach((key) => {
     const stat = isPlainObject(merged.character[key]) ? merged.character[key] : safe.character[key];
     const max = clampNumber(stat.max, 1, Infinity, safe.character[key].max);
-    const current = clampNumber(stat.current, 0, max, 0);
+    const current = clampNumber(stat.current, 0, max, max);
     merged.character[key] = { ...stat, current, max };
   });
 
@@ -592,6 +620,9 @@ function bindBackupActions() {
       const nextState = normalizeState(parsed);
       Object.assign(state, nextState);
       saveState();
+      // O item em edição pode não existir no backup: sai do modo de edição e limpa os formulários.
+      clearInventoryForm();
+      journalForm.reset();
       renderAll();
       alert('Backup importado com sucesso!');
     } catch (error) {
@@ -786,6 +817,8 @@ function renderDiceHistory() {
 
   if (!state.diceHistory.length) {
     diceHistoryList.innerHTML = '<li class="empty-state">Nenhuma rolagem registrada ainda.</li>';
+    // Sem histórico (ex.: depois de importar um backup sem rolagens), não mostra a rolagem antiga.
+    lastRollText.textContent = 'Nenhuma';
     return;
   }
 

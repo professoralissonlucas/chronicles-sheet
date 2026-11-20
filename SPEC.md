@@ -38,8 +38,8 @@ Objetivos declarados no prompt:
 ```
 Ana Livia e Zarpelon/
 ├── index.html               (284 linhas)  Estrutura e conteúdo da página
-├── styles.css               (700 linhas)  Visual, temas e responsividade
-├── script.js                (896 linhas)  Estado, lógica, eventos e renderização
+├── styles.css               (702 linhas)  Visual, temas e responsividade
+├── script.js                (929 linhas)  Estado, lógica, eventos e renderização
 ├── TEXTOS SCRIPT JOGO.txt   ( 43 linhas)  Prompt/requisitos originais do projeto
 ├── README.md                              Apresentação, créditos e como usar
 ├── CLAUDE.md                              Regras para quem for alterar o projeto
@@ -84,7 +84,7 @@ Idioma `pt-BR`. O `<body>` começa com `data-theme="field"`.
 | Sanidade | `#sanityBar`, `#sanityCurrentText`, `#sanityMaxInput`, `#sanityStatus` | botões `.vital-btn` com `data-stat="sanity"` |
 | Pontos de Esforço | `#effortBar`, `#effortCurrentText`, `#effortMaxInput`, `#effortStatus` | botões `.vital-btn` com `data-stat="effort"` |
 | Atributos | `.attribute[data-attribute="forca"...]` | FOR, DES, CON, INT, SAB, CAR — número `1–30`. O JS escreve no campo o valor salvo no state |
-| Ocultar atributos | `#toggleAttributesBtn` | alterna entre "Ocultar" e "Mostrar" e esconde `.attributes-grid` |
+| Ocultar atributos | `#toggleAttributesBtn` | alterna entre "Ocultar" e "Mostrar" e esconde `.attributes-grid`; fica à direita do título "Atributos" (`.attributes-header` usa o mesmo alinhamento de `.hp-header`) |
 
 O valor **atual** de cada barra é só exibido (`<strong>`); muda pelos botões. O valor **máximo** é editável num `<input>`.
 
@@ -134,9 +134,13 @@ state = {
 
 ### 4.1 Estado padrão (primeiro acesso)
 
-Personagem de exemplo **Aelric Vale**, Bárbaro nível 3, HP 24/30, Sanidade 12/20, Esforço 4/8, atributos 16/12/15/9/11/10; inventário com "Poção de cura" ×2 e "Mapa antigo" ×1; uma rolagem `d20 = 15`; uma entrada de diário "Primeira entrada" com `#Combate` e `#Quest`. A intenção é a página nunca abrir vazia e já demonstrar cada recurso.
+Personagem de exemplo **Aelric Vale**, Bárbaro nível 3, HP 24/30, Sanidade 12/20, Esforço 4/8, atributos 16/12/15/9/11/10; inventário com "Poção de cura" ×2 e "Mapa antigo" ×1; uma rolagem `d20 = 15`; uma entrada de diário "Primeira entrada" com `#Combate` e `#Quest`. A intenção é a página nunca abrir vazia e já demonstrar cada recurso. Esse exemplo (`defaultState`) aparece **só no primeiro acesso**, quando não há nada salvo (ou quando o que está salvo está corrompido, ou o armazenamento está bloqueado).
 
-### 4.2 IDs
+### 4.2 Valores neutros (`emptyState`)
+
+Quando os dados carregados ou um backup importado **não têm** alguma parte, essa parte é completada com valores neutros, e não com o exemplo: personagem sem nome, sem classe e sem anotações; nível 1; barras **cheias** com os máximos padrão (HP 30/30, Sanidade 20/20, Esforço 8/8); todos os atributos em 10; `inventory`, `diceHistory` e `journal` vazios; tema `field`; atributos visíveis.
+
+### 4.3 IDs
 
 `generateId()` usa `crypto.randomUUID()` quando disponível; senão monta `id-<timestamp>-<aleatório hex>`.
 
@@ -208,7 +212,7 @@ Não há framework reativo: o redesenho é manual, por bloco, geralmente limpand
 - `Math.floor(Math.random() * lados) + 1`.
 - Resultado no formato `"d20 = 15"` com timestamp; entra no topo; o histórico guarda **as 12 últimas**.
 - Datas no formato curto `pt-BR` (`Intl.DateTimeFormat`, ex.: `20/11/2026 14:32`).
-- "Limpar histórico" esvazia a lista e volta "Última rolagem" para "Nenhuma".
+- "Limpar histórico" esvazia a lista e volta "Última rolagem" para "Nenhuma". O próprio `renderDiceHistory` também mostra "Nenhuma" sempre que o histórico estiver vazio (por exemplo, depois de importar um backup sem rolagens).
 
 ### 6.5 Diário de bordo
 - Título e registro obrigatórios. Entradas novas no topo.
@@ -228,15 +232,15 @@ Não há framework reativo: o redesenho é manual, por bloco, geralmente limpand
 
 ### 6.7 Backup
 - **Exportar**: serializa `state` com indentação, cria um `Blob` e força o download de `chronicles-sheet-backup-AAAA-MM-DD-HH-MM-SS.json`.
-- **Importar**: lê o arquivo e faz `JSON.parse`. Depois, `looksLikeBackup` confere se o conteúdo parece um backup deste site: precisa ser um objeto com `character` (objeto) **ou** pelo menos uma das listas `inventory`, `journal` ou `diceHistory`. Se passar, o conteúdo vai para `normalizeState`, substitui o estado, é salvo, a tela é redesenhada e aparece o `alert` de sucesso. Se o JSON for malformado ou não parecer um backup, aparece o `alert` "Arquivo inválido..." e **nada é alterado**. O input é limpo no final, para permitir importar o mesmo arquivo de novo.
-- Backups exportados por versões anteriores (sem `attributesHidden`, sem `sanity`/`effort`) continuam importando, e os campos que faltam recebem os valores padrão.
+- **Importar**: lê o arquivo e faz `JSON.parse`. Depois, `looksLikeBackup` confere se o conteúdo parece um backup deste site: precisa ser um objeto com `character` (objeto) **ou** pelo menos uma das listas `inventory`, `journal` ou `diceHistory`. Se passar, o conteúdo vai para `normalizeState`, substitui o estado e é salvo. Em seguida, o inventário **sai do modo de edição** (`clearInventoryForm`, o mesmo do "Cancelar edição") e os formulários do inventário e do diário são limpos. Por fim, a tela é redesenhada e aparece o `alert` de sucesso. Se o JSON for malformado ou não parecer um backup, aparece o `alert` "Arquivo inválido..." e **nada é alterado**. O input é limpo no final, para permitir importar o mesmo arquivo de novo.
+- Backups exportados por versões anteriores (sem `attributesHidden`, sem `sanity`/`effort`) continuam importando. Backups parciais (ex.: só `journal`) também são aceitos. Em todos os casos, o que falta recebe os **valores neutros** (ver 4.2), nunca o personagem de exemplo.
 
 ### 6.8 Normalização e segurança
 `normalizeState` é usado ao carregar do `localStorage` e ao importar:
 - Entrada que não é objeto (array, número, `null`) é tratada como `{}`.
-- Faz *deep merge* sobre uma cópia do estado padrão: chaves que faltam são completadas; arrays recebidos substituem os padrões; uma lista ausente ou que não seja array volta à lista de exemplo.
-- **Personagem**: `name`, `className` e `notes` viram texto; `level` fica entre 1 e 99; cada atributo fica entre 1 e 30 (inválido volta ao padrão).
-- **Barras vitais**: `hp`, `sanity` e `effort` são recuperados quando vêm `null` ou inválidos; `max ≥ 1` e `0 ≤ current ≤ max`.
+- Faz *deep merge* sobre uma cópia de `emptyState` (valores neutros, ver 4.2): chaves que faltam são completadas; arrays recebidos substituem os vazios; uma lista ausente ou que não seja array fica vazia.
+- **Personagem**: `name`, `className` e `notes` viram texto; `level` fica entre 1 e 99; cada atributo fica entre 1 e 30 (inválido vira 10).
+- **Barras vitais**: `hp`, `sanity` e `effort` ausentes, `null` ou inválidos ficam cheios com o máximo padrão; `max ≥ 1` e `0 ≤ current ≤ max` (`current` inválido vira o máximo).
 - **inventory**: descarta itens sem `name`; `quantity` vira número ≥ 1; `description` vira texto.
 - **diceHistory**: descarta entradas sem `result` em texto; no máximo 12.
 - **journal**: descarta entradas sem `title` ou `content`; `tags` vira sempre um array de textos (texto solto passa por `normalizeTags`).
@@ -311,7 +315,8 @@ Encontrados na análise do código original e nas revisões seguintes. Cada item
    *Resolvido:* `bindAttributesToggle` alterna a classe `.hidden` na grade e o texto "Ocultar"/"Mostrar", e salva a preferência em `state.attributesHidden`.
 3. ✅ **CSS sem uso** (`.attribute-name-row`, `.attribute-name-input`, `.remove-attribute-btn`, `.attributes-area`, `.add-attribute-btn`), restos de um recurso de atributos personalizados não terminado.
    *Resolvido:* as classes foram apagadas do `styles.css`.
-   ⏳ *Pendente:* `.attributes-section` e `.attributes-header` são usadas no HTML mas não têm estilo, então o botão "Ocultar" fica embaixo do título "Atributos", e não ao lado.
+   ✅ *Também resolvido:* o botão "Ocultar" ficava embaixo do título "Atributos", porque `.attributes-header` não tinha estilo. Agora `.attributes-header` entra na mesma regra de `.hp-header` (título à esquerda, controle à direita), sem cores, fontes ou tamanhos novos. Conferido nos dois temas, em 900px e 640px.
+   ⏳ *Pendente:* `.attributes-section` continua sem estilo, então o cabeçalho "Atributos" fica colado na caixa "Esforço está estável.", sem o espaço e a linha que separam as barras (`.vital-bar-item`).
 4. ⏳ **Diário sem edição/exclusão** de entradas.
 
 ### 9.2 Comportamentos estranhos
@@ -332,28 +337,30 @@ Encontrados na análise do código original e nas revisões seguintes. Cada item
     *Resolvido:* `escapeAttribute` foi removido; as três barras são recuperadas pelo mesmo laço.
 12. ✅ **Importar qualquer JSON válido (ex.: `{}`) apagava os dados**, trocando tudo pelo personagem de exemplo, e mostrava "sucesso".
     *Resolvido:* `looksLikeBackup` recusa arquivos sem `character` e sem nenhuma das listas; aparece "Arquivo inválido..." e nada muda.
-    ⏳ *Limitação que continua:* um backup que tenha só parte dos dados (ex.: só `journal`) é aceito, e o que falta é preenchido com os dados de exemplo.
+    ✅ *Também resolvido:* um backup que tenha só parte dos dados (ex.: só `journal`) recebia os dados de exemplo no que faltava. Agora `normalizeState` completa com `emptyState` (valores neutros, ver 4.2); o exemplo aparece só no primeiro acesso.
 13. ✅ **Remover o item em edição fazia perder o que estava sendo digitado.** O formulário ficava em modo edição e o "Salvar" não salvava nada.
     *Resolvido:* ao remover o item que está sendo editado, o formulário sai do modo de edição (`clearInventoryForm`).
-    ⏳ *Pendente:* importar um backup no meio de uma edição tem o mesmo efeito, porque o ID em edição pode deixar de existir.
+    ✅ *Também resolvido:* importar um backup no meio de uma edição tinha o mesmo efeito. Agora, depois de uma importação bem-sucedida, o inventário sai do modo de edição e os formulários do inventário e do diário são limpos. Uma importação recusada não mexe em nada.
 14. ✅ **Com o `localStorage` bloqueado ou cheio, o site travava.**
     *Resolvido:* leitura e gravação estão em `try/catch`; o site funciona só em memória e mostra um único `console.warn` sugerindo "Exportar Backup".
+15. ✅ **"Última rolagem" mostrava uma rolagem antiga** depois de importar um backup sem histórico de dados, porque `renderDiceHistory` saía antes de atualizar o texto quando a lista estava vazia.
+    *Resolvido:* com o histórico vazio, `renderDiceHistory` também mostra "Nenhuma".
 
 ### 9.4 Outros pendentes encontrados na revisão
-15. ⏳ Com uma busca ou um filtro de tag ativo, uma entrada nova do diário pode não aparecer na lista, e parece que não foi salva.
-16. ⏳ Tags com maiúsculas diferentes (`#combate` e `#Combate`) aparecem separadas no filtro, mas a busca por texto ignora maiúsculas.
-17. ⏳ Quantidade, nível, atributos e máximos aceitam números decimais (ex.: 2,5).
-18. ⏳ Com duas abas abertas, a última que salvar sobrescreve as mudanças da outra.
-19. ⏳ O Exportar libera o link do download logo depois do clique, sem colocá-lo na página. Funciona nos navegadores atuais, mas pode falhar em antigos.
+16. ⏳ Com uma busca ou um filtro de tag ativo, uma entrada nova do diário pode não aparecer na lista, e parece que não foi salva.
+17. ⏳ Tags com maiúsculas diferentes (`#combate` e `#Combate`) aparecem separadas no filtro, mas a busca por texto ignora maiúsculas.
+18. ⏳ Quantidade, nível, atributos e máximos aceitam números decimais (ex.: 2,5).
+19. ⏳ Com duas abas abertas, a última que salvar sobrescreve as mudanças da outra.
+20. ⏳ O Exportar libera o link do download logo depois do clique, sem colocá-lo na página. Funciona nos navegadores atuais, mas pode falhar em antigos.
 
 ### 9.5 CSS e visual
-20. ✅ **O SVG do fundo do tema Diário estava fora do padrão** (`;utf8`, `<`/`>` sem codificar, `fill="transparent"`).
+21. ✅ **O SVG do fundo do tema Diário estava fora do padrão** (`;utf8`, `<`/`>` sem codificar, `fill="transparent"`).
     *Resolvido:* data URI recodificada; a comparação de pixels confirmou que o resultado é idêntico.
-21. ✅ **O padrão SVG não aparecia**, porque ficava escondido embaixo do gradiente.
+22. ✅ **O padrão SVG não aparecia**, porque ficava escondido embaixo do gradiente.
     *Resolvido:* a ordem das camadas foi invertida.
-22. ✅ **Sem `color-mix()`, o fundo do tema field sumia** e a página ficava branca.
+23. ✅ **Sem `color-mix()`, o fundo do tema field sumia** e a página ficava branca.
     *Resolvido:* fallback via `@supports` (ver 7.4), junto com outros fallbacks.
-23. ✅ **O inventário transbordava o painel** em telas largas.
+24. ✅ **O inventário transbordava o painel** em telas largas.
     *Resolvido:* formulário e lista empilhados (ver 7.2).
 
 ### 9.6 Detalhes
