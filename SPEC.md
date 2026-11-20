@@ -1,6 +1,6 @@
 # SPEC — Chronicles & Sheet
 
-> Especificação descritiva do projeto **como ele está hoje**. Este documento só analisa; nenhum arquivo do projeto foi alterado.
+> Especificação descritiva do projeto **como ele está hoje**. A primeira versão deste documento analisou o código original das alunas. Depois disso vieram correções, e as seções abaixo descrevem o comportamento atual. A seção 9 registra o que foi resolvido e o que continua pendente.
 
 ---
 
@@ -38,12 +38,15 @@ Objetivos declarados no prompt:
 ```
 Ana Livia e Zarpelon/
 ├── index.html               (284 linhas)  Estrutura e conteúdo da página
-├── styles.css               (716 linhas)  Visual, temas e responsividade
-├── script.js                (674 linhas)  Estado, lógica, eventos e renderização
-└── TEXTOS SCRIPT JOGO.txt   ( 43 linhas)  Prompt/requisitos originais do projeto
+├── styles.css               (700 linhas)  Visual, temas e responsividade
+├── script.js                (896 linhas)  Estado, lógica, eventos e renderização
+├── TEXTOS SCRIPT JOGO.txt   ( 43 linhas)  Prompt/requisitos originais do projeto
+├── README.md                              Apresentação, créditos e como usar
+├── CLAUDE.md                              Regras para quem for alterar o projeto
+└── SPEC.md                                Este documento
 ```
 
-Não existe `package.json`, pasta de assets, testes nem controle de versão (a pasta não é um repositório git). Para rodar, basta abrir `index.html` no navegador.
+Não existe `package.json`, pasta de assets nem testes automatizados no repositório. O código está no GitHub (`professoralissonlucas/chronicles-sheet`, branch `main`). Para rodar, basta abrir `index.html` no navegador.
 
 Separação de responsabilidades:
 
@@ -80,8 +83,8 @@ Idioma `pt-BR`. O `<body>` começa com `data-theme="field"`.
 | Pontos de Vida | `#hpBar`, `#hpCurrentText`, `#hpMaxInput`, `#hpStatus` | botões `-5 -1 +1 +5` com `data-stat="hp"` |
 | Sanidade | `#sanityBar`, `#sanityCurrentText`, `#sanityMaxInput`, `#sanityStatus` | botões `.vital-btn` com `data-stat="sanity"` |
 | Pontos de Esforço | `#effortBar`, `#effortCurrentText`, `#effortMaxInput`, `#effortStatus` | botões `.vital-btn` com `data-stat="effort"` |
-| Atributos | `.attribute[data-attribute="forca"...]` | FOR, DES, CON, INT, SAB, CAR — número `1–30`, padrão 10 |
-| Ocultar atributos | `#toggleAttributesBtn` | botão "Ocultar" |
+| Atributos | `.attribute[data-attribute="forca"...]` | FOR, DES, CON, INT, SAB, CAR — número `1–30`. O JS escreve no campo o valor salvo no state |
+| Ocultar atributos | `#toggleAttributesBtn` | alterna entre "Ocultar" e "Mostrar" e esconde `.attributes-grid` |
 
 O valor **atual** de cada barra é só exibido (`<strong>`); muda pelos botões. O valor **máximo** é editável num `<input>`.
 
@@ -112,6 +115,7 @@ Chave no `localStorage`: **`chronicles-sheet-state-v1`** (o sufixo `v1` indica i
 ```js
 state = {
   theme: 'field' | 'journal',
+  attributesHidden: boolean,          // preferência do botão Ocultar/Mostrar (padrão false)
   character: {
     name: string,
     className: string,
@@ -143,9 +147,10 @@ Personagem de exemplo **Aelric Vale**, Bárbaro nível 3, HP 24/30, Sanidade 12/
 ```
 carrega script.js (no fim do <body>)
   └─ state = loadState()
-        ├─ não há nada salvo → cópia de defaultState
-        ├─ há JSON válido     → normalizeState(JSON salvo)
-        └─ JSON corrompido    → aviso no console + defaultState
+        ├─ não há nada salvo     → cópia de defaultState
+        ├─ há JSON válido        → normalizeState(JSON salvo)
+        ├─ JSON corrompido       → aviso no console + defaultState
+        └─ armazenamento bloqueado → aviso único no console + defaultState (só em memória)
   └─ init()
         ├─ bind* (registra todos os eventos)
         └─ renderAll()
@@ -157,6 +162,7 @@ Padrão usado em toda a aplicação — **evento → altera `state` → `saveSta
 |---|---|
 | `renderTheme` | `data-theme` do body e texto do botão de tema |
 | `renderCharacterBlock` | nome, classe, nível, anotações |
+| `renderAttributes` | valores dos 6 atributos, visibilidade da grade e texto/`aria-label` do botão Ocultar/Mostrar |
 | `renderHp` / `renderSanity` / `renderEffort` | largura da barra, número atual, máximo, mensagem de status |
 | `renderInventory` | lista de itens + liga os botões Editar/Remover |
 | `renderDiceHistory` | histórico + "Última rolagem" |
@@ -164,17 +170,23 @@ Padrão usado em toda a aplicação — **evento → altera `state` → `saveSta
 
 Não há framework reativo: o redesenho é manual, por bloco, geralmente limpando `innerHTML` e recriando a lista.
 
+**Campos numéricos (nível, atributos, máximos):** o evento `input` salva só quando o valor digitado é válido e **não reescreve o campo**, para não atrapalhar a digitação. O evento `change` (sair do campo ou apertar Enter) aplica os limites, salva e redesenha. O helper `clampNumber(valor, min, max, padrão)` faz a conversão e o limite.
+
+**Armazenamento:** `saveState` e `loadState` usam `try/catch`. Se o `localStorage` estiver bloqueado ou cheio, o site continua funcionando só em memória e mostra **um único** `console.warn`, sugerindo usar "Exportar Backup".
+
 ---
 
 ## 6. Regras de negócio por funcionalidade
 
 ### 6.1 Ficha
 - Nome, classe e anotações são salvos a cada tecla (`input`).
-- Nível: `Number(valor) || 1` — campo vazio ou inválido vira 1.
+- Nível: enquanto a pessoa digita, só valores válidos são salvos, e o campo pode ficar vazio. Ao sair do campo, o nível fica entre **1 e 99**; vazio ou inválido vira 1.
+- Atributos: mesma lógica, com limite de **1 a 30**. Se o campo ficar vazio, volta ao último valor salvo. Os valores entram no backup.
+- Botão Ocultar/Mostrar: esconde ou mostra a grade de atributos (classe `.hidden`) e salva a preferência em `state.attributesHidden`.
 
 ### 6.2 Barras vitais (HP, Sanidade, Esforço)
 - Botões somam/subtraem e o resultado é limitado a `0 ≤ atual ≤ máximo`.
-- Alterar o máximo: `max(1, valor)`.
+- Alterar o máximo: enquanto a pessoa digita, valores vazios ou menores que 1 são ignorados. Ao sair do campo, o máximo é confirmado (vazio volta ao último válido) e o **atual é reduzido para não passar do máximo**. Esse ajuste é feito só no `change` para não perder o valor atual no meio da digitação (ex.: trocar 30 por 25 passa por "2").
 - Porcentagem = `atual / máximo`, limitada a 0–100%, vira a largura da barra.
 - Três estados, com mensagens próprias para cada barra:
 
@@ -189,7 +201,7 @@ Não há framework reativo: o redesenho é manual, por bloco, geralmente limpand
 ### 6.3 Inventário
 - **Adicionar**: item novo entra no **topo** da lista (`unshift`). Nome vazio é rejeitado (foco volta ao campo). Quantidade mínima 1.
 - **Editar**: "Editar" copia o item para o formulário, guarda o ID no campo oculto, troca o botão para "Salvar alterações" e mostra "Cancelar edição". Ao enviar, substitui o item com o mesmo ID.
-- **Remover**: imediato, sem confirmação.
+- **Remover**: imediato, sem confirmação. Se o item removido é o que está sendo editado, o formulário sai do modo de edição e é limpo (mesmo efeito de "Cancelar edição").
 - Lista vazia mostra: "Nenhum item no inventário. Adicione o primeiro item."
 
 ### 6.4 Rolador de dados
@@ -216,11 +228,23 @@ Não há framework reativo: o redesenho é manual, por bloco, geralmente limpand
 
 ### 6.7 Backup
 - **Exportar**: serializa `state` com indentação, cria um `Blob` e força o download de `chronicles-sheet-backup-AAAA-MM-DD-HH-MM-SS.json`.
-- **Importar**: lê o arquivo, faz `JSON.parse`, passa por `normalizeState`, substitui o estado, salva, redesenha tudo e mostra `alert` de sucesso. Em erro: `alert` "Arquivo inválido...". O input é limpo no final, para permitir importar o mesmo arquivo de novo.
+- **Importar**: lê o arquivo e faz `JSON.parse`. Depois, `looksLikeBackup` confere se o conteúdo parece um backup deste site: precisa ser um objeto com `character` (objeto) **ou** pelo menos uma das listas `inventory`, `journal` ou `diceHistory`. Se passar, o conteúdo vai para `normalizeState`, substitui o estado, é salvo, a tela é redesenhada e aparece o `alert` de sucesso. Se o JSON for malformado ou não parecer um backup, aparece o `alert` "Arquivo inválido..." e **nada é alterado**. O input é limpo no final, para permitir importar o mesmo arquivo de novo.
+- Backups exportados por versões anteriores (sem `attributesHidden`, sem `sanity`/`effort`) continuam importando, e os campos que faltam recebem os valores padrão.
 
 ### 6.8 Normalização e segurança
-- `normalizeState` faz *deep merge* do JSON recebido sobre uma cópia do estado padrão: chaves que faltam são completadas; arrays recebidos substituem os padrões; tema inválido volta para `field`; atributos ausentes são restaurados.
-- `escapeHtml` é usado em todo texto do usuário inserido via `innerHTML` (nomes, descrições, tags, títulos, conteúdo), evitando injeção de HTML.
+`normalizeState` é usado ao carregar do `localStorage` e ao importar:
+- Entrada que não é objeto (array, número, `null`) é tratada como `{}`.
+- Faz *deep merge* sobre uma cópia do estado padrão: chaves que faltam são completadas; arrays recebidos substituem os padrões; uma lista ausente ou que não seja array volta à lista de exemplo.
+- **Personagem**: `name`, `className` e `notes` viram texto; `level` fica entre 1 e 99; cada atributo fica entre 1 e 30 (inválido volta ao padrão).
+- **Barras vitais**: `hp`, `sanity` e `effort` são recuperados quando vêm `null` ou inválidos; `max ≥ 1` e `0 ≤ current ≤ max`.
+- **inventory**: descarta itens sem `name`; `quantity` vira número ≥ 1; `description` vira texto.
+- **diceHistory**: descarta entradas sem `result` em texto; no máximo 12.
+- **journal**: descarta entradas sem `title` ou `content`; `tags` vira sempre um array de textos (texto solto passa por `normalizeTags`).
+- **IDs** ausentes ou repetidos são gerados de novo; **timestamps** inválidos viram `null` (exibidos como "Sem data", em vez de quebrar o `formatDate`).
+- `theme` inválido volta para `field`; `attributesHidden` que não seja booleano vira `false`.
+- Campos extras desconhecidos nos itens são preservados.
+
+`escapeHtml` é usado em todo texto do usuário inserido via `innerHTML` (nomes, descrições, tags, títulos, conteúdo, `data-id` e `value` das opções), evitando injeção de HTML.
 
 ---
 
@@ -232,24 +256,27 @@ Todas as cores vêm de variáveis em `:root` (tema **field**), redefinidas em `b
 | | Ficha de Campo (`field`) | Diário Manuscrito (`journal`) |
 |---|---|---|
 | Estética | técnica, escura, moderna | pergaminho antigo / fantasia |
-| Fundo | azul-marinho com brilho radial roxo | marrom com padrão SVG sutil embutido |
+| Fundo | azul-marinho com brilho radial roxo | marrom com padrão SVG de quadradinhos dourados bem discretos, por cima do gradiente |
 | Primária / acento | roxo `#8b5cf6` / ciano `#22d3ee` | bronze `#9a6a30` / dourado `#d4a15c` |
 | Fonte | Segoe UI (sans-serif) | Georgia (serifada) |
 
 ### 7.2 Layout
 - Container de até 1200px; grid de 12 colunas; painéis ocupam 6 colunas (dois por linha), diário ocupa a linha toda.
+- Inventário: formulário em cima e lista embaixo, em qualquer largura (o painel tem no máximo ~550px, e duas colunas lado a lado não cabiam).
 - Cartões com cantos arredondados, sombra e `backdrop-filter: blur` (efeito vidro).
 - Botões sobem 1px no hover; barras animam a largura.
 
 ### 7.3 Responsividade
-- **≤ 900px**: cada painel ocupa a largura toda; inventário empilha formulário e lista.
+- **≤ 900px**: cada painel ocupa a largura toda.
 - **≤ 640px**: topo em coluna; botões do topo em largura total; ficha, filtros e atributos em 1 coluna; dados em 2 colunas.
 
 ### 7.4 Outros
 - Classe utilitária `.hidden` (`display: none !important`).
 - `.empty-state` para listas vazias (borda tracejada).
 - Barra de rolagem customizada (WebKit).
-- Usa `color-mix()` no fundo, o que exige navegador recente.
+- Usa `color-mix()` no fundo do tema field, com fallback via `@supports` para navegadores sem suporte (cor já calculada `rgb(12, 18, 34)`).
+- Fallbacks para navegadores antigos: `-webkit-backdrop-filter`, `top/right/bottom/left` antes de `inset`, valores fixos antes de `min()` e `clamp()`.
+- O SVG de fundo é uma data URI codificada no padrão (`charset=utf-8`, `%3C`/`%3E`).
 
 ---
 
@@ -258,10 +285,10 @@ Todas as cores vêm de variáveis em `:root` (tema **field**), redefinidas em `b
 | Requisito (TEXTOS SCRIPT JOGO.txt) | Situação |
 |---|---|
 | HTML/CSS/JS separados, sem frameworks | ✅ Atendido |
-| Persistência em `localStorage` | ✅ Atendido (exceto atributos, ver §9) |
+| Persistência em `localStorage` | ✅ Atendido (com aviso e funcionamento em memória se o armazenamento estiver bloqueado) |
 | Exportar/importar `.json` | ✅ Atendido |
 | Nome, classe, nível, anotações editáveis | ✅ Atendido |
-| Atributos editáveis | ⚠️ Editáveis na tela, mas **não salvos** (ver §9) |
+| Atributos editáveis | ✅ Atendido (salvos, limitados a 1–30 e incluídos no backup) |
 | HP com barra e botões ±1/±5 | ✅ Atendido |
 | Alerta de HP crítico (< 25% ou 0) | ✅ Atendido, com dois níveis (aviso e crítico) |
 | Inventário: adicionar/editar/remover, nome/qtd/descrição | ✅ Atendido |
@@ -275,26 +302,61 @@ Todas as cores vêm de variáveis em `:root` (tema **field**), redefinidas em `b
 
 ## 9. Pontos incompletos, inconsistências e riscos
 
-Encontrados na análise. **Nenhum foi corrigido**; ficam registrados para decisão futura.
+Encontrados na análise do código original e nas revisões seguintes. Cada item está marcado como **✅ Resolvido** (com uma linha sobre como) ou **⏳ Pendente**.
 
 ### 9.1 Funcionalidades incompletas
-1. **Atributos não estão ligados ao JavaScript.** Os inputs FOR/DES/CON/INT/SAB/CAR não têm eventos nem render. Resultado: a tela sempre mostra 10 (valor do HTML), ignora os valores do estado (16, 12, 15...), e alterações **não são salvas** nem entram no backup.
-2. **Botão "Ocultar" atributos (`#toggleAttributesBtn`) não faz nada**: não tem handler no JS.
-3. **CSS sem uso**: `.attribute-name-row`, `.attribute-name-input`, `.remove-attribute-btn`, `.attributes-area`, `.add-attribute-btn` não correspondem a nenhum elemento. Indicam um recurso planejado de **atributos personalizados** (adicionar/renomear/remover) que foi abandonado ou não terminado. Já `.attributes-section` e `.attributes-header` são usados no HTML mas não têm estilo.
-4. **Diário sem edição/exclusão** de entradas.
+1. ✅ **Atributos não estavam ligados ao JavaScript.** A tela sempre mostrava 10 e as alterações não eram salvas.
+   *Resolvido:* `bindAttributeInputs` e `renderAttributes` ligam os campos ao `state.character.attributes`, com limite de 1 a 30; os valores entram no backup.
+2. ✅ **O botão "Ocultar" atributos não fazia nada.**
+   *Resolvido:* `bindAttributesToggle` alterna a classe `.hidden` na grade e o texto "Ocultar"/"Mostrar", e salva a preferência em `state.attributesHidden`.
+3. ✅ **CSS sem uso** (`.attribute-name-row`, `.attribute-name-input`, `.remove-attribute-btn`, `.attributes-area`, `.add-attribute-btn`), restos de um recurso de atributos personalizados não terminado.
+   *Resolvido:* as classes foram apagadas do `styles.css`.
+   ⏳ *Pendente:* `.attributes-section` e `.attributes-header` são usadas no HTML mas não têm estilo, então o botão "Ocultar" fica embaixo do título "Atributos", e não ao lado.
+4. ⏳ **Diário sem edição/exclusão** de entradas.
 
 ### 9.2 Comportamentos estranhos
-5. **Diminuir o máximo não ajusta o atual**: com HP 24/30, mudar o máximo para 10 deixa "24 / 10" (a barra fica em 100%). Vale para as três barras.
-6. **Campo Nível ao apagar**: como cada tecla chama `Number(v) || 1` e redesenha o campo, apagar o número para digitar outro faz aparecer "1" na hora. Também não há limite de 99 no JS (só no HTML).
-7. **Esconder painéis pelo tema** pode confundir: no modo padrão o diário não aparece, e o usuário pode achar que ele não existe.
-8. **`journalList` não é declarado** no JS; funciona só porque o navegador cria variáveis globais para elementos com `id`. É frágil.
+5. ✅ **Diminuir o máximo não ajustava o atual** ("24 / 10").
+   *Resolvido:* no `change` do campo de máximo, o atual é reduzido para `≤ máximo`; `normalizeState` também garante isso nos dados carregados.
+6. ✅ **O campo Nível virava "1" ao ser apagado**, e não havia limite de 99 no JS.
+   *Resolvido:* o `input` só salva valores válidos sem reescrever o campo; o `change` aplica o limite de 1 a 99. A mesma correção vale para os campos de máximo.
+7. ⏳ **Esconder painéis pelo tema** pode confundir: no modo padrão o diário não aparece. Ficou como está, por ser uma escolha de design.
+8. ✅ **`journalList` não era declarado** no JS.
+   *Resolvido:* declarado com `getElementById`, como os outros elementos.
 
-### 9.3 Robustez do import
-9. `normalizeState` valida a estrutura geral, mas **não valida cada item** das listas. Um backup com entrada de diário sem `tags` quebra o filtro (`entry.tags.some`).
-10. O `id` dos itens do inventário entra em `data-id="..."` **sem escape**. Um backup `.json` manipulado poderia injetar HTML. Risco baixo (exige importar arquivo malicioso), mas é a única brecha no padrão de `escapeHtml`.
-11. Pequenas redundâncias: `escapeAttribute` repete o que `escapeHtml` já faz; `normalizeState` recupera `hp` se vier `null`, mas não faz o mesmo com `sanity` e `effort` (se vierem `null`, os botões dessas barras dão erro).
+### 9.3 Robustez do import e do armazenamento
+9. ✅ **`normalizeState` não validava cada item** das listas; uma entrada de diário sem `tags` quebrava o filtro.
+   *Resolvido:* cada item de `inventory`, `diceHistory` e `journal` é validado e os inválidos são descartados; `sanity`/`effort` nulos são recuperados; IDs e datas também são validados (ver 6.8).
+10. ✅ **O `data-id` do inventário entrava sem escape.**
+    *Resolvido:* agora passa por `escapeHtml`.
+11. ✅ **Redundâncias**: `escapeAttribute` duplicava `escapeHtml`; `sanity`/`effort` nulos davam erro.
+    *Resolvido:* `escapeAttribute` foi removido; as três barras são recuperadas pelo mesmo laço.
+12. ✅ **Importar qualquer JSON válido (ex.: `{}`) apagava os dados**, trocando tudo pelo personagem de exemplo, e mostrava "sucesso".
+    *Resolvido:* `looksLikeBackup` recusa arquivos sem `character` e sem nenhuma das listas; aparece "Arquivo inválido..." e nada muda.
+    ⏳ *Limitação que continua:* um backup que tenha só parte dos dados (ex.: só `journal`) é aceito, e o que falta é preenchido com os dados de exemplo.
+13. ✅ **Remover o item em edição fazia perder o que estava sendo digitado.** O formulário ficava em modo edição e o "Salvar" não salvava nada.
+    *Resolvido:* ao remover o item que está sendo editado, o formulário sai do modo de edição (`clearInventoryForm`).
+    ⏳ *Pendente:* importar um backup no meio de uma edição tem o mesmo efeito, porque o ID em edição pode deixar de existir.
+14. ✅ **Com o `localStorage` bloqueado ou cheio, o site travava.**
+    *Resolvido:* leitura e gravação estão em `try/catch`; o site funciona só em memória e mostra um único `console.warn` sugerindo "Exportar Backup".
 
-### 9.4 Detalhes
+### 9.4 Outros pendentes encontrados na revisão
+15. ⏳ Com uma busca ou um filtro de tag ativo, uma entrada nova do diário pode não aparecer na lista, e parece que não foi salva.
+16. ⏳ Tags com maiúsculas diferentes (`#combate` e `#Combate`) aparecem separadas no filtro, mas a busca por texto ignora maiúsculas.
+17. ⏳ Quantidade, nível, atributos e máximos aceitam números decimais (ex.: 2,5).
+18. ⏳ Com duas abas abertas, a última que salvar sobrescreve as mudanças da outra.
+19. ⏳ O Exportar libera o link do download logo depois do clique, sem colocá-lo na página. Funciona nos navegadores atuais, mas pode falhar em antigos.
+
+### 9.5 CSS e visual
+20. ✅ **O SVG do fundo do tema Diário estava fora do padrão** (`;utf8`, `<`/`>` sem codificar, `fill="transparent"`).
+    *Resolvido:* data URI recodificada; a comparação de pixels confirmou que o resultado é idêntico.
+21. ✅ **O padrão SVG não aparecia**, porque ficava escondido embaixo do gradiente.
+    *Resolvido:* a ordem das camadas foi invertida.
+22. ✅ **Sem `color-mix()`, o fundo do tema field sumia** e a página ficava branca.
+    *Resolvido:* fallback via `@supports` (ver 7.4), junto com outros fallbacks.
+23. ✅ **O inventário transbordava o painel** em telas largas.
+    *Resolvido:* formulário e lista empilhados (ver 7.2).
+
+### 9.6 Detalhes
 - No prompt, "estilo paminho" é um erro de digitação de "pergaminho".
 - Os botões de vital (Sanidade/Esforço) também têm a classe `.hp-btn`; a separação é feita pelo `data-stat`, então funciona, mas os nomes de classe podem confundir.
 - Mensagens de alerta usam `alert()` nativo.
@@ -304,8 +366,9 @@ Encontrados na análise. **Nenhum foi corrigido**; ficam registrados para decis�
 ## 10. Como executar e publicar
 
 - **Local**: abrir `index.html` no navegador (Chrome, Edge, Firefox ou Safari recentes).
-- **GitHub Pages**: subir os três arquivos para a raiz do repositório e ativar Pages na branch principal. Não há build.
+- **GitHub Pages**: https://professoralissonlucas.github.io/chronicles-sheet/ — publicado a partir da raiz da branch `main`. Não há build.
 - **Resetar dados**: apagar a chave `chronicles-sheet-state-v1` no `localStorage` (DevTools → Application → Local Storage) ou importar um backup.
+- **Armazenamento bloqueado** (algumas janelas anônimas ou configurações de privacidade): o site funciona, mas não guarda nada ao fechar. Use "Exportar Backup".
 
 ---
 

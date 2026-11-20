@@ -1,5 +1,9 @@
 const STORAGE_KEY = 'chronicles-sheet-state-v1';
 
+// Fica true depois do primeiro aviso de armazenamento bloqueado, para avisar uma vez só.
+// Precisa estar antes do loadState(), que é chamado logo abaixo.
+let storageWarningShown = false;
+
 const defaultState = {
   theme: 'field',
   attributesHidden: false,
@@ -270,12 +274,32 @@ function deepMerge(base, incoming) {
   return output;
 }
 
+// Se o armazenamento estiver bloqueado ou cheio, o site continua funcionando só em memória.
+function warnStorageUnavailable(error) {
+  if (storageWarningShown) return;
+  storageWarningShown = true;
+  console.warn(
+    'Não foi possível usar o armazenamento do navegador. Os dados não serão salvos ao fechar a página. Use "Exportar Backup" para guardar uma cópia.',
+    error
+  );
+}
+
 function saveState() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  } catch (error) {
+    warnStorageUnavailable(error);
+  }
 }
 
 function loadState() {
-  const saved = localStorage.getItem(STORAGE_KEY);
+  let saved = null;
+  try {
+    saved = localStorage.getItem(STORAGE_KEY);
+  } catch (error) {
+    warnStorageUnavailable(error);
+  }
+
   if (!saved) return structuredClone(defaultState);
 
   try {
@@ -562,6 +586,9 @@ function bindBackupActions() {
     try {
       const text = await file.text();
       const parsed = JSON.parse(text);
+      if (!looksLikeBackup(parsed)) {
+        throw new Error('O arquivo não parece um backup do Chronicles & Sheet.');
+      }
       const nextState = normalizeState(parsed);
       Object.assign(state, nextState);
       saveState();
@@ -574,6 +601,13 @@ function bindBackupActions() {
       importInput.value = '';
     }
   });
+}
+
+// Um backup deste site tem o objeto "character" ou pelo menos uma das listas.
+function looksLikeBackup(data) {
+  if (!isPlainObject(data)) return false;
+  return isPlainObject(data.character) ||
+    ['inventory', 'journal', 'diceHistory'].some((key) => Array.isArray(data[key]));
 }
 
 function renderAll() {
@@ -728,6 +762,10 @@ function renderInventory() {
   inventoryList.querySelectorAll('[data-action="delete"]').forEach((button) => {
     button.addEventListener('click', () => {
       const itemId = button.dataset.id;
+      // Se o item removido é o que está sendo editado, sai do modo de edição.
+      if (inventoryIdInput.value === itemId) {
+        clearInventoryForm();
+      }
       state.inventory = state.inventory.filter((entry) => entry.id !== itemId);
       saveState();
       renderInventory();
