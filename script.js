@@ -2,6 +2,7 @@ const STORAGE_KEY = 'chronicles-sheet-state-v1';
 
 const defaultState = {
   theme: 'field',
+  attributesHidden: false,
   character: {
     name: 'Aelric Vale',
     className: 'Bárbaro',
@@ -46,6 +47,10 @@ const characterFields = {
   notes: document.getElementById('charNotes'),
 };
 
+const attributeInputs = document.querySelectorAll('.attribute input');
+const attributesGrid = document.querySelector('.attributes-grid');
+const toggleAttributesBtn = document.getElementById('toggleAttributesBtn');
+
 const hpElements = {
   bar: document.getElementById('hpBar'),
   currentText: document.getElementById('hpCurrentText'),
@@ -89,11 +94,14 @@ const journalTagsInput = document.getElementById('journalTagsInput');
 const journalContentInput = document.getElementById('journalContent');
 const journalSearchInput = document.getElementById('journalSearch');
 const journalTagFilter = document.getElementById('journalTagFilter');
+const journalList = document.getElementById('journalList');
 
 init();
 
 function init() {
   bindCharacterInputs();
+  bindAttributeInputs();
+  bindAttributesToggle();
   bindHpButtons();
   bindVitalButtons();
   bindVitalMaxInputs();
@@ -116,26 +124,134 @@ function generateId() {
 
 function normalizeState(raw) {
   const safe = JSON.parse(JSON.stringify(defaultState));
-  const merged = deepMerge(safe, raw || {});
+  // Backup que não é um objeto (array, número, null) é tratado como vazio.
+  const merged = deepMerge(safe, isPlainObject(raw) ? raw : {});
 
-  if (!merged.character || !merged.character.hp) {
-    merged.character = { ...safe.character, ...(merged.character || {}) };
-    merged.character.hp = { ...safe.character.hp, ...((merged.character && merged.character.hp) || {}) };
+  if (!isPlainObject(merged.character)) {
+    merged.character = { ...safe.character };
   }
+
+  // Recupera hp, sanity e effort quando vierem null ou inválidos.
+  // O atual fica sempre entre 0 e o máximo.
+  ['hp', 'sanity', 'effort'].forEach((key) => {
+    const stat = isPlainObject(merged.character[key]) ? merged.character[key] : safe.character[key];
+    const max = clampNumber(stat.max, 1, Infinity, safe.character[key].max);
+    const current = clampNumber(stat.current, 0, max, 0);
+    merged.character[key] = { ...stat, current, max };
+  });
+
+  ['name', 'className', 'notes'].forEach((key) => {
+    const value = merged.character[key];
+    if (typeof value === 'number') {
+      merged.character[key] = String(value);
+    } else if (typeof value !== 'string') {
+      merged.character[key] = '';
+    }
+  });
+  merged.character.level = clampNumber(merged.character.level, 1, 99, 1);
 
   if (!Array.isArray(merged.inventory)) merged.inventory = safe.inventory;
   if (!Array.isArray(merged.diceHistory)) merged.diceHistory = safe.diceHistory;
   if (!Array.isArray(merged.journal)) merged.journal = safe.journal;
 
+  // Valida cada item das listas e descarta os inválidos.
+  const inventoryIds = new Set();
+  const diceIds = new Set();
+  const journalIds = new Set();
+  merged.inventory = merged.inventory.map((item) => normalizeInventoryItem(item, inventoryIds)).filter(Boolean);
+  merged.diceHistory = merged.diceHistory.map((entry) => normalizeDiceEntry(entry, diceIds)).filter(Boolean).slice(0, 12);
+  merged.journal = merged.journal.map((entry) => normalizeJournalEntry(entry, journalIds)).filter(Boolean);
+
   if (!merged.theme || !['field', 'journal'].includes(merged.theme)) {
     merged.theme = defaultState.theme;
   }
 
-  if (!merged.character.attributes || typeof merged.character.attributes !== 'object') {
+  if (typeof merged.attributesHidden !== 'boolean') {
+    merged.attributesHidden = false;
+  }
+
+  if (!isPlainObject(merged.character.attributes)) {
     merged.character.attributes = { ...safe.character.attributes };
   }
 
+  Object.keys(safe.character.attributes).forEach((key) => {
+    merged.character.attributes[key] = clampNumber(merged.character.attributes[key], 1, 30, safe.character.attributes[key]);
+  });
+
   return merged;
+}
+
+function isPlainObject(value) {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+// Converte para número e limita entre min e max. Valor vazio ou inválido vira o padrão.
+function clampNumber(value, min, max, fallback) {
+  const number = Number(value);
+  if (value === null || value === '' || typeof value === 'boolean' || !Number.isFinite(number)) {
+    return fallback;
+  }
+
+  return Math.min(max, Math.max(min, number));
+}
+
+// Mantém o id se for texto e ainda não tiver sido usado; senão gera um novo.
+function normalizeId(id, usedIds) {
+  const nextId = typeof id === 'string' && id && !usedIds.has(id) ? id : generateId();
+  usedIds.add(nextId);
+  return nextId;
+}
+
+// Data inválida vira null, porque o formatDate quebra com datas inválidas.
+function normalizeTimestamp(value) {
+  if (value === null || value === undefined || value === '') return null;
+  return Number.isNaN(new Date(value).getTime()) ? null : value;
+}
+
+function normalizeInventoryItem(item, usedIds) {
+  if (!isPlainObject(item)) return null;
+
+  const name = typeof item.name === 'string' ? item.name.trim() : '';
+  if (!name) return null;
+
+  return {
+    ...item,
+    id: normalizeId(item.id, usedIds),
+    name,
+    quantity: clampNumber(item.quantity, 1, Infinity, 1),
+    description: typeof item.description === 'string' ? item.description : '',
+  };
+}
+
+function normalizeDiceEntry(entry, usedIds) {
+  if (!isPlainObject(entry)) return null;
+  if (typeof entry.result !== 'string' || !entry.result.trim()) return null;
+
+  return {
+    ...entry,
+    id: normalizeId(entry.id, usedIds),
+    timestamp: normalizeTimestamp(entry.timestamp),
+  };
+}
+
+function normalizeJournalEntry(entry, usedIds) {
+  if (!isPlainObject(entry)) return null;
+  if (typeof entry.title !== 'string' || !entry.title.trim()) return null;
+  if (typeof entry.content !== 'string' || !entry.content.trim()) return null;
+
+  let tags = [];
+  if (Array.isArray(entry.tags)) {
+    tags = entry.tags.filter((tag) => typeof tag === 'string' && tag.trim());
+  } else if (typeof entry.tags === 'string') {
+    tags = normalizeTags(entry.tags);
+  }
+
+  return {
+    ...entry,
+    id: normalizeId(entry.id, usedIds),
+    tags,
+    timestamp: normalizeTimestamp(entry.timestamp),
+  };
 }
 
 function deepMerge(base, incoming) {
@@ -175,13 +291,51 @@ function bindCharacterInputs() {
     input.addEventListener('input', (event) => {
       const value = event.target.value;
       if (key === 'level') {
-        state.character.level = Number(value) || 1;
+        // Enquanto digita, só salva números válidos; o campo é corrigido no change.
+        const level = clampNumber(value, 1, 99, null);
+        if (level === null) return;
+        state.character.level = level;
       } else if (key === 'name' || key === 'className' || key === 'notes') {
         state.character[key] = value;
       }
       saveState();
-      renderCharacterBlock();
     });
+  });
+
+  // Ao sair do campo (ou apertar Enter), o nível fica entre 1 e 99.
+  characterFields.level.addEventListener('change', () => {
+    state.character.level = clampNumber(characterFields.level.value, 1, 99, 1);
+    saveState();
+    renderCharacterBlock();
+  });
+}
+
+function bindAttributeInputs() {
+  attributeInputs.forEach((input) => {
+    const key = input.closest('.attribute').dataset.attribute;
+
+    input.addEventListener('input', () => {
+      // Enquanto digita, só salva números válidos; o campo é corrigido no change.
+      const value = clampNumber(input.value, 1, 30, null);
+      if (value === null) return;
+      state.character.attributes[key] = value;
+      saveState();
+    });
+
+    // Ao sair do campo, limita entre 1 e 30. Campo vazio volta ao último valor salvo.
+    input.addEventListener('change', () => {
+      state.character.attributes[key] = clampNumber(input.value, 1, 30, state.character.attributes[key]);
+      saveState();
+      renderAttributes();
+    });
+  });
+}
+
+function bindAttributesToggle() {
+  toggleAttributesBtn.addEventListener('click', () => {
+    state.attributesHidden = !state.attributesHidden;
+    saveState();
+    renderAttributes();
   });
 }
 
@@ -228,8 +382,16 @@ function bindVitalMaxInputs() {
   ];
 
   configs.forEach(({ key, element, path }) => {
+    const renderStat = () => {
+      if (key === 'hp') renderHp();
+      if (key === 'sanity') renderSanity();
+      if (key === 'effort') renderEffort();
+    };
+
     element.addEventListener('input', () => {
-      const nextMax = Math.max(1, Number(element.value) || 1);
+      // Enquanto digita, ignora campo vazio ou menor que 1 para não forçar "1".
+      const nextMax = clampNumber(element.value, 1, Infinity, null);
+      if (nextMax === null || Number(element.value) < 1) return;
       const currentStat = getNestedValue(state, path) || { max: nextMax, current: 0 };
 
       setNestedValue(state, path, {
@@ -238,10 +400,23 @@ function bindVitalMaxInputs() {
         current: currentStat.current,
       });
       saveState();
+      renderStat();
+    });
 
-      if (key === 'hp') renderHp();
-      if (key === 'sanity') renderSanity();
-      if (key === 'effort') renderEffort();
+    // Ao sair do campo, confirma o máximo e ajusta o atual para não passar dele.
+    // Isso é feito só aqui para não perder o valor atual enquanto a pessoa digita.
+    element.addEventListener('change', () => {
+      const currentStat = getNestedValue(state, path) || { max: 1, current: 0 };
+      const typedMax = Number(element.value);
+      const nextMax = element.value !== '' && typedMax >= 1 ? typedMax : Math.max(1, Number(currentStat.max) || 1);
+
+      setNestedValue(state, path, {
+        ...currentStat,
+        max: nextMax,
+        current: Math.min(Number(currentStat.current) || 0, nextMax),
+      });
+      saveState();
+      renderStat();
     });
   });
 }
@@ -404,6 +579,7 @@ function bindBackupActions() {
 function renderAll() {
   renderTheme();
   renderCharacterBlock();
+  renderAttributes();
   renderHp();
   renderSanity();
   renderEffort();
@@ -423,6 +599,18 @@ function renderCharacterBlock() {
   characterFields.className.value = state.character.className;
   characterFields.level.value = state.character.level;
   characterFields.notes.value = state.character.notes;
+}
+
+function renderAttributes() {
+  attributeInputs.forEach((input) => {
+    const key = input.closest('.attribute').dataset.attribute;
+    input.value = state.character.attributes[key];
+  });
+
+  const hidden = Boolean(state.attributesHidden);
+  attributesGrid.classList.toggle('hidden', hidden);
+  toggleAttributesBtn.textContent = hidden ? 'Mostrar' : 'Ocultar';
+  toggleAttributesBtn.setAttribute('aria-label', hidden ? 'Mostrar atributos' : 'Ocultar atributos');
 }
 
 function renderHp() {
@@ -515,8 +703,8 @@ function renderInventory() {
         <p class="item-desc">${escapeHtml(item.description || 'Sem descrição.')}</p>
       </div>
       <div class="item-actions">
-        <button type="button" data-action="edit" data-id="${item.id}">Editar</button>
-        <button type="button" data-action="delete" data-id="${item.id}">Remover</button>
+        <button type="button" data-action="edit" data-id="${escapeHtml(item.id)}">Editar</button>
+        <button type="button" data-action="delete" data-id="${escapeHtml(item.id)}">Remover</button>
       </div>
     `;
 
@@ -599,7 +787,7 @@ function renderJournal() {
 
   const currentValue = journalTagFilter.value;
   journalTagFilter.innerHTML = '<option value="all">Todas</option>' +
-    allTags.map((tag) => `<option value="${escapeAttribute(tag)}">${escapeHtml(tag)}</option>`).join('');
+    allTags.map((tag) => `<option value="${escapeHtml(tag)}">${escapeHtml(tag)}</option>`).join('');
 
   if (currentValue && allTags.includes(currentValue)) {
     journalTagFilter.value = currentValue;
@@ -667,8 +855,4 @@ function escapeHtml(value) {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#039;');
-}
-
-function escapeAttribute(value) {
-  return escapeHtml(value).replace(/"/g, '&quot;');
 }
